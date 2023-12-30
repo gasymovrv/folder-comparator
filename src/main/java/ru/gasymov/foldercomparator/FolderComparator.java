@@ -1,7 +1,7 @@
 package ru.gasymov.foldercomparator;
 
 import java.io.File;
-import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
@@ -22,13 +22,10 @@ public class FolderComparator {
         final Map<MetaInfo, File> folder1Files = filesMapByMetaInfo(folder1);
         final Map<MetaInfo, File> folder2Files = filesMapByMetaInfo(folder2);
 
-        final Set<MetaInfo> folder1MetaInfos = folder1Files.keySet();
-        final Set<MetaInfo> folder2MetaInfos = folder2Files.keySet();
-
-        final List<MetaInfo> absentInFolder1 = filter(folder2MetaInfos, folder1MetaInfos);
-        final List<MetaInfo> absentInFolder2 = filter(folder1MetaInfos, folder2MetaInfos);
-
-        return new ComparingResult(absentInFolder1, absentInFolder2);
+        return new ComparingResult(
+                leaveFilesOnlyInFirstSource(folder1Files, folder2Files.keySet()),
+                leaveFilesOnlyInFirstSource(folder2Files, folder1Files.keySet())
+        );
     }
 
     private Map<MetaInfo, File> filesMapByMetaInfo(String folder) {
@@ -40,12 +37,25 @@ public class FolderComparator {
                 );
     }
 
-    private List<MetaInfo> filter(Set<MetaInfo> folder1MetaInfos, Set<MetaInfo> folder2MetaInfos) {
-        return folder1MetaInfos
+    /**
+     * Leave files that are found in the first source, but not in the second source.
+     *
+     * @param folder1FilesMap  first source files map.
+     * @param folder2MetaInfos second source files meta info set.
+     * @return files map with files that are found in the first source, but not in the second source.
+     */
+    private Map<MetaInfo, File> leaveFilesOnlyInFirstSource(Map<MetaInfo, File> folder1FilesMap, Set<MetaInfo> folder2MetaInfos) {
+        return folder1FilesMap
+                .entrySet()
                 .stream()
-                .filter((it) -> !folder2MetaInfos.contains(it))
-                .sorted()
-                .toList();
+                .filter(it -> !folder2MetaInfos.contains(it.getKey()))
+                .sorted(Map.Entry.comparingByKey())
+                .collect(Collectors.toMap(
+                        Map.Entry<MetaInfo, File>::getKey,
+                        Map.Entry<MetaInfo, File>::getValue,
+                        (oldValue, newValue) -> oldValue,
+                        LinkedHashMap::new)
+                );
     }
 }
 

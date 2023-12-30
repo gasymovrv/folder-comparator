@@ -1,10 +1,10 @@
 package ru.gasymov.foldercomparator;
 
-import java.util.List;
+import java.io.File;
+import java.util.Map;
 
 public record ComparingResult(
-        List<MetaInfo> filesAbsentInFirstFolder,
-        List<MetaInfo> filesAbsentInSecondFolder
+        Map<MetaInfo, File> filesOnlyInFirstFolder,
+        Map<MetaInfo, File> filesOnlyInSecondFolder
 ) {
-
 }
