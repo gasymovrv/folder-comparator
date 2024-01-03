@@ -94,7 +94,7 @@ public class FilesHandler {
                 entryStream,
                 ProgressBar.builder()
                         .showSpeed()
-                        .setStyle(ProgressBarStyle.UNICODE_BLOCK)
+                        .setStyle(ProgressBarStyle.ASCII)
                         .setConsumer(new ConsoleProgressBarConsumer(System.out, 120))
                         .setTaskName("Handling '" + folder + "': ")
 
