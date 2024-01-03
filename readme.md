@@ -40,7 +40,7 @@ Files present ONLY in 'D:\DIR_2':
 3. ```-c2``` - copy files found only in directory 2 to directory 1
 4. ```-d1``` - delete files found only in directory 1
 5. ```-d2``` - delete files found only in directory 2
-6. ```-l``` - print the name of each found file
+6. ```-l``` - print the name of each found file (it can clog up the entire output)
 7. ```-p``` - run in parallel to speed up (print will be non-ordered)
 
 ### Launch examples:

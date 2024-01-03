@@ -26,4 +26,12 @@ public class CopyOption extends Option {
     public int hashCode() {
         return Objects.hash(super.hashCode(), destination);
     }
+
+    @Override
+    public String toString() {
+        return "CopyOption { " +
+                "value=" + super.getValue() +
+                ", destination='" + destination +
+                "' }";
+    }
 }

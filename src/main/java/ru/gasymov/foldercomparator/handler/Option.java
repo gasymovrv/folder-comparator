@@ -17,6 +17,10 @@ public class Option {
         PARALLEL
     }
 
+    public boolean matches(Value value) {
+        return this.value == value;
+    }
+
     public Value getValue() {
         return value;
     }
@@ -31,5 +35,10 @@ public class Option {
     @Override
     public int hashCode() {
         return Objects.hash(value);
+    }
+
+    @Override
+    public String toString() {
+        return value.toString();
     }
 }

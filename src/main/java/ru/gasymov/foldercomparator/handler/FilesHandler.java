@@ -2,14 +2,13 @@ package ru.gasymov.foldercomparator.handler;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.List;
+import java.nio.file.StandardCopyOption;
 import java.util.Map;
-import java.util.Set;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
+import me.tongfei.progressbar.ConsoleProgressBarConsumer;
 import me.tongfei.progressbar.ProgressBar;
+import me.tongfei.progressbar.ProgressBarStyle;
 import ru.gasymov.foldercomparator.MetaInfo;
 
 import static ru.gasymov.foldercomparator.handler.Option.Value.*;
@@ -17,49 +16,40 @@ import static ru.gasymov.foldercomparator.handler.Option.Value.*;
 public class FilesHandler {
 
     private final Map<MetaInfo, File> files;
-    private final Set<Option> options;
+    private final OptionsContainer optionsContainer;
+    private final String folder;
 
-    public FilesHandler(Map<MetaInfo, File> files, Set<Option> options) {
+    public FilesHandler(Map<MetaInfo, File> files, String folder, OptionsContainer optionsContainer) {
         this.files = files;
-        this.options = options;
+        this.folder = new File(folder).getPath();
+        this.optionsContainer = optionsContainer;
     }
 
-    public void handle(String folder) {
+    public void handle() {
         if (files.isEmpty()) {
             System.out.printf("Not found files present ONLY in '%s'\n\n", folder);
             return;
         }
+        final boolean isParallelNeeded = optionsContainer.hasCommon(PARALLEL);
+        final boolean isDetailsNeeded = optionsContainer.hasCommon(DETAILED_PRINT);
+        final boolean isCopyNeeded = optionsContainer.has(folder, COPY);
+        final boolean isDeleteNeeded = optionsContainer.has(folder, DELETE);
 
-        final var optionsMap = options.stream().collect(Collectors.groupingBy(
-                Option::getValue,
-                Collectors.mapping(Function.identity(), Collectors.toList()))
-        );
-        final var optValues = optionsMap.keySet();
-
-        final Stream<Map.Entry<MetaInfo, File>> entryStream;
-        if (optValues.contains(PARALLEL)) entryStream = files.entrySet().parallelStream();
+        Stream<Map.Entry<MetaInfo, File>> entryStream;
+        if (isParallelNeeded) entryStream = files.entrySet().parallelStream();
         else entryStream = files.entrySet().stream();
 
+        if (!isDetailsNeeded && (isCopyNeeded || isDeleteNeeded)) entryStream = wrapWithProgressBar(entryStream);
+
         final var print = String.format("Found %s files present ONLY in '%s'", files.size(), folder);
-        if (optValues.contains(DETAILED_PRINT)) System.out.println(print + ":");
+        if (isDetailsNeeded) System.out.println(print + ":");
         else System.out.println(print);
 
-        doOptions(folder, entryStream, optionsMap);
+        runOptions(entryStream, isDetailsNeeded, isCopyNeeded, isDeleteNeeded);
     }
 
-    private static void doOptions(String folder,
-                                  Stream<Map.Entry<MetaInfo, File>> entryStream,
-                                  Map<Option.Value, List<Option>> optionsMap) {
-        final var optValues = optionsMap.keySet();
-        final boolean isDetailsNeeded = optValues.contains(DETAILED_PRINT);
-        final boolean isCopyNeeded = optValues.contains(COPY);
-        final boolean isDeleteNeeded = optValues.contains(DELETE);
-
-        final Stream<Map.Entry<MetaInfo, File>> files;
-        if (!isDetailsNeeded && (isCopyNeeded || isDeleteNeeded)) files = ProgressBar.wrap(entryStream, "Handling...");
-        else files = entryStream;
-
-        files.forEach(entry -> {
+    private void runOptions(Stream<Map.Entry<MetaInfo, File>> entryStream, boolean isDetailsNeeded, boolean isCopyNeeded, boolean isDeleteNeeded) {
+        entryStream.forEach(entry -> {
             final var metaInfo = entry.getKey();
             final var file = entry.getValue();
 
@@ -68,29 +58,46 @@ public class FilesHandler {
                     System.out.printf("%s%s (size=%d)\n", folder, metaInfo.relativePath(), metaInfo.size());
                 }
                 if (isCopyNeeded) {
-                    for (Option it : optionsMap.get(COPY)) {
+                    for (Option it : optionsContainer.get(folder, COPY)) {
                         var copyOption = (CopyOption) it;
-                        FileUtils.copyFile(file, new File(copyOption.getDestination() + metaInfo.relativePath()));
+                        FileUtils.copyFile(
+                                file,
+                                new File(copyOption.getDestination() + metaInfo.relativePath()),
+                                StandardCopyOption.COPY_ATTRIBUTES
+                        );
                     }
                 }
                 if (isDeleteNeeded) {
                     FileUtils.delete(file);
                 }
             } catch (IOException e) {
+                System.err.println(e);
                 throw new RuntimeException(e);
             }
         });
 
         if (isCopyNeeded) {
-            for (Option it : optionsMap.get(COPY)) {
+            for (Option it : optionsContainer.get(folder, COPY)) {
                 var copyOption = (CopyOption) it;
-                System.out.printf("Files found only in '%s' copied to '%s'\n", folder, copyOption.getDestination());
+                System.out.printf("\nFiles found only in '%s' copied to '%s'\n", folder, copyOption.getDestination());
             }
         }
 
         if (isDeleteNeeded) {
-            System.out.printf("Files found ONLY in '%s' deleted\n", folder);
+            System.out.printf("\nFiles found ONLY in '%s' deleted\n", folder);
         }
         System.out.println();
+    }
+
+    private Stream<Map.Entry<MetaInfo, File>> wrapWithProgressBar(Stream<Map.Entry<MetaInfo, File>> entryStream) {
+        return ProgressBar.wrap(
+                entryStream,
+                ProgressBar.builder()
+                        .showSpeed()
+                        .setStyle(ProgressBarStyle.UNICODE_BLOCK)
+                        .setConsumer(new ConsoleProgressBarConsumer(System.out, 120))
+                        .setTaskName("Handling '" + folder + "': ")
+
+        );
     }
 }

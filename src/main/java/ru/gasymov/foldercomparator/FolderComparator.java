@@ -14,8 +14,8 @@ public class FolderComparator {
     private final String folder2;
 
     public FolderComparator(String folder1, String folder2) {
-        this.folder1 = folder1;
-        this.folder2 = folder2;
+        this.folder1 = new File(folder1).getPath();
+        this.folder2 = new File(folder2).getPath();
     }
 
     public ComparingResult compare() {
