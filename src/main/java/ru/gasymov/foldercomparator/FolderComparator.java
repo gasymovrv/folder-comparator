@@ -19,13 +19,16 @@ public class FolderComparator {
     }
 
     public ComparingResult compare() {
-        final Map<MetaInfo, File> folder1Files = filesMapByMetaInfo(folder1);
-        final Map<MetaInfo, File> folder2Files = filesMapByMetaInfo(folder2);
+        System.out.println("Comparing...");
+        final var folder1Files = filesMapByMetaInfo(folder1);
+        final var folder2Files = filesMapByMetaInfo(folder2);
 
-        return new ComparingResult(
+        var result = new ComparingResult(
                 leaveFilesOnlyInFirstSource(folder1Files, folder2Files.keySet()),
                 leaveFilesOnlyInFirstSource(folder2Files, folder1Files.keySet())
         );
+        System.out.println("Comparing completed");
+        return result;
     }
 
     private Map<MetaInfo, File> filesMapByMetaInfo(String folder) {
