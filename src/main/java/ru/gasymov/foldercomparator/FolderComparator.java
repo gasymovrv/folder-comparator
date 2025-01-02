@@ -1,15 +1,20 @@
 package ru.gasymov.foldercomparator;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Function;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.file.PathUtils;
 
 public class FolderComparator {
-
     private final String folder1;
     private final String folder2;
 
@@ -19,25 +24,46 @@ public class FolderComparator {
     }
 
     public ComparingResult compare() {
-        System.out.println("Comparing...");
-        final var folder1Files = filesMapByMetaInfo(folder1);
-        final var folder2Files = filesMapByMetaInfo(folder2);
+        System.out.println(LocalDateTime.now() + " - Reading...");
+        final var folder1Files = readAndMapFilesByMetaInfo(folder1);
+        final var folder2Files = readAndMapFilesByMetaInfo(folder2);
+        System.out.println(LocalDateTime.now() + " - Reading completed");
 
+        System.out.println(LocalDateTime.now() + " - Comparing...");
         var result = new ComparingResult(
                 leaveFilesOnlyInFirstSource(folder1Files, folder2Files.keySet()),
                 leaveFilesOnlyInFirstSource(folder2Files, folder1Files.keySet())
         );
-        System.out.println("Comparing completed");
+        System.out.println(LocalDateTime.now() + " - Comparing completed");
         return result;
     }
 
-    private Map<MetaInfo, File> filesMapByMetaInfo(String folder) {
-        return FileUtils.listFiles(new File(folder), null, true)
-                .stream()
-                .collect(Collectors.toMap(
-                        it -> new MetaInfo(it.getPath().replace(folder, ""), FileUtils.sizeOf(it)),
-                        Function.identity())
-                );
+    private Map<MetaInfo, File> readAndMapFilesByMetaInfo(String folder) {
+        System.out.println("Start reading folder: " + folder);
+        final long start = System.currentTimeMillis();
+        var map = new ConcurrentHashMap<MetaInfo, File>();
+
+        try (var paths = Files.find(Paths.get(folder), Integer.MAX_VALUE, (path, basicFileAttributes) -> Files.isRegularFile(path));
+             var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+
+            paths.forEach(path -> executor.submit(() -> {
+                try {
+                    map.put(new MetaInfo(path.toString().replace(folder, ""), PathUtils.sizeOf(path)), path.toFile());
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }));
+            executor.shutdown();
+
+            if (!executor.awaitTermination(5, TimeUnit.MINUTES)) {
+                throw new RuntimeException("File-read executor terminated by timeout");
+            }
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        final long stop = System.currentTimeMillis();
+        System.out.println("Completed reading folder: " + folder + ", duration: " + (stop - start) + " ms");
+        return map;
     }
 
     /**

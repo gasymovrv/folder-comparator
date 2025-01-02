@@ -1,7 +1,6 @@
 package ru.gasymov.foldercomparator;
 
 import java.util.Arrays;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import ru.gasymov.foldercomparator.handler.FilesHandler;
@@ -39,18 +38,21 @@ public class Main {
                 new FilesHandler(comparingResult.filesOnlyInSecondFolder(), folder2, optionsContainer).handle();
 
         if (optionsContainer.hasCommon(Option.Value.PARALLEL)) {
-            final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
-            try {
+            try (var executor = Executors.newFixedThreadPool(2)) {
                 executor.submit(handleFirst);
                 executor.submit(handleSecond);
-            } finally {
                 executor.shutdown();
+                if (!executor.awaitTermination(10, TimeUnit.MINUTES))
+                    throw new RuntimeException("Main executor terminated by timeout");
             }
-            final boolean isTerminated = executor.awaitTermination(10, TimeUnit.MINUTES);
-            if (!isTerminated) throw new RuntimeException("Main executor terminated by timeout");
         } else {
-            handleFirst.run();
-            handleSecond.run();
+            if (optionsContainer.has(folder2, Option.Value.DELETE) && !optionsContainer.has(folder1, Option.Value.DELETE)) {
+                handleSecond.run();
+                handleFirst.run();
+            } else {
+                handleFirst.run();
+                handleSecond.run();
+            }
         }
 
         System.out.println("======================== COMPLETED ============================");
