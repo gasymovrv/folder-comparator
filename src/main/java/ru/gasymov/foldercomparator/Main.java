@@ -16,20 +16,24 @@ public class Main {
         }
         final var folder1 = args[0];
         final var folder2 = args[1];
-        System.out.printf("Got mandatory arguments: folder1 = '%s', folder2 = '%s'\n", folder1, folder2);
-
         final var optionalArgs = Arrays.stream(Arrays.copyOfRange(args, 2, args.length)).toList();
-        final OptionsContainer optionsContainer = OptionsContainer.create(folder1, folder2)
-                .setOptions(optionalArgs);
-        optionsContainer.print();
-        System.out.println();
+        final OptionsContainer optionsContainer = OptionsContainer.create(folder1, folder2).setOptions(optionalArgs);
 
-        System.out.println("======================== COMPARING ============================");
-        final var folderComparator = new FolderComparator(folder1, folder2);
+        System.out.printf("Folder1 = '%s'\nFolder2 = '%s'\n", folder1, folder2);
+        final boolean verbose = optionsContainer.hasCommon(Option.Value.DETAILED_PRINT);
+        if (verbose) {
+            optionsContainer.print();
+            System.out.println();
+
+            System.out.println("======================== COMPARING ============================");
+        }
+        final var folderComparator = new FolderComparator(folder1, folder2, optionsContainer);
         final var comparingResult = folderComparator.compare();
         System.out.println();
 
-        System.out.println("======================== HANDLING ============================");
+        if (verbose) {
+            System.out.println("======================== HANDLING ============================");
+        }
 
         final Runnable handleFirst = () ->
                 new FilesHandler(comparingResult.filesOnlyInFirstFolder(), folder1, optionsContainer).handle();

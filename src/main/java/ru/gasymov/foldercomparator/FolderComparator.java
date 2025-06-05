@@ -13,33 +13,46 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.commons.io.file.PathUtils;
+import ru.gasymov.foldercomparator.handler.Option;
+import ru.gasymov.foldercomparator.handler.OptionsContainer;
 
 public class FolderComparator {
     private final String folder1;
     private final String folder2;
+    private final boolean verbose;
 
-    public FolderComparator(String folder1, String folder2) {
+    public FolderComparator(String folder1, String folder2, OptionsContainer optionsContainer) {
         this.folder1 = new File(folder1).getPath();
         this.folder2 = new File(folder2).getPath();
+        this.verbose = optionsContainer.hasCommon(Option.Value.DETAILED_PRINT);
     }
 
     public ComparingResult compare() {
-        System.out.println(LocalDateTime.now() + " - Reading...");
+        if (verbose) {
+            System.out.println(LocalDateTime.now() + " - Reading...");
+        } else {
+            System.out.println("Reading and comparing...");
+        }
         final var folder1Files = readAndMapFilesByMetaInfo(folder1);
         final var folder2Files = readAndMapFilesByMetaInfo(folder2);
-        System.out.println(LocalDateTime.now() + " - Reading completed");
-
-        System.out.println(LocalDateTime.now() + " - Comparing...");
+        if (verbose) {
+            System.out.println(LocalDateTime.now() + " - Reading completed");
+            System.out.println(LocalDateTime.now() + " - Comparing...");
+        }
         var result = new ComparingResult(
                 leaveFilesOnlyInFirstSource(folder1Files, folder2Files.keySet()),
                 leaveFilesOnlyInFirstSource(folder2Files, folder1Files.keySet())
         );
-        System.out.println(LocalDateTime.now() + " - Comparing completed");
+        if (verbose) {
+            System.out.println(LocalDateTime.now() + " - Comparing completed");
+        }
         return result;
     }
 
     private Map<MetaInfo, File> readAndMapFilesByMetaInfo(String folder) {
-        System.out.println("Start reading folder: " + folder);
+        if (verbose) {
+            System.out.println("Start reading folder: " + folder);
+        }
         final long start = System.currentTimeMillis();
         var map = new ConcurrentHashMap<MetaInfo, File>();
 
@@ -62,7 +75,9 @@ public class FolderComparator {
             throw new RuntimeException(e);
         }
         final long stop = System.currentTimeMillis();
-        System.out.println("Completed reading folder: " + folder + ", duration: " + (stop - start) + " ms");
+        if (verbose) {
+            System.out.println("Completed reading folder: " + folder + ", duration: " + (stop - start) + " ms");
+        }
         return map;
     }
 
