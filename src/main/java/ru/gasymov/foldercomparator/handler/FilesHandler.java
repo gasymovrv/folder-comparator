@@ -4,11 +4,9 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.StandardCopyOption;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
-import me.tongfei.progressbar.ConsoleProgressBarConsumer;
-import me.tongfei.progressbar.ProgressBar;
-import me.tongfei.progressbar.ProgressBarStyle;
 import ru.gasymov.foldercomparator.MetaInfo;
 
 import static ru.gasymov.foldercomparator.handler.Option.Value.*;
@@ -90,14 +88,30 @@ public class FilesHandler {
     }
 
     private Stream<Map.Entry<MetaInfo, File>> wrapWithProgressBar(Stream<Map.Entry<MetaInfo, File>> entryStream) {
-        return ProgressBar.wrap(
-                entryStream,
-                ProgressBar.builder()
-                        .showSpeed()
-                        .setStyle(ProgressBarStyle.ASCII)
-                        .setConsumer(new ConsoleProgressBarConsumer(System.out, 120))
-                        .setTaskName("Handling '" + folder + "': ")
+        // Create a simple counter to track progress
+        final var counter = new AtomicInteger(0);
+        final int total = files.size();
 
-        );
+        // For parallel processing we can't show progress correctly
+        if (optionsContainer.hasCommon(PARALLEL)) {
+            System.out.println("Processing files...");
+            return entryStream;
+        } else {
+            return entryStream.peek(entry -> {
+                // Update progress
+                int currentCount = counter.incrementAndGet();
+                if (currentCount % 10 == 0 || currentCount == total) {
+                    double percent = (currentCount * 100.0) / total;
+
+                    // Clear the line and move cursor to start
+                    System.out.print("\r");
+                    System.out.printf("Processing files: %d/%d (%.1f%%)", currentCount, total, percent);
+
+                    if (currentCount == total) {
+                        System.out.println(); // New line when done
+                    }
+                }
+            });
+        }
     }
 }
