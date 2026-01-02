@@ -32,21 +32,26 @@ public class FilesHandler {
         final boolean isDetailsNeeded = optionsContainer.hasCommon(DETAILED_PRINT);
         final boolean isCopyNeeded = optionsContainer.has(folder, COPY);
         final boolean isDeleteNeeded = optionsContainer.has(folder, DELETE);
+        final var progress = new Progress(files.size());
 
         Stream<Map.Entry<MetaInfo, File>> entryStream;
         if (isParallelNeeded) entryStream = files.entrySet().parallelStream();
         else entryStream = files.entrySet().stream();
 
-        if (!isDetailsNeeded && (isCopyNeeded || isDeleteNeeded)) entryStream = wrapWithProgressBar(entryStream);
+        if (!isDetailsNeeded && (isCopyNeeded || isDeleteNeeded)) entryStream = wrapWithProgressBar(entryStream, progress);
 
         final var print = String.format("Found %s files present ONLY in '%s'", files.size(), folder);
         if (isDetailsNeeded) System.out.println(print + ":");
         else System.out.println(print);
 
-        runOptions(entryStream, isDetailsNeeded, isCopyNeeded, isDeleteNeeded);
+        runOptions(entryStream, isDetailsNeeded, isCopyNeeded, isDeleteNeeded, progress);
     }
 
-    private void runOptions(Stream<Map.Entry<MetaInfo, File>> entryStream, boolean isDetailsNeeded, boolean isCopyNeeded, boolean isDeleteNeeded) {
+    private void runOptions(Stream<Map.Entry<MetaInfo, File>> entryStream,
+                            boolean isDetailsNeeded,
+                            boolean isCopyNeeded,
+                            boolean isDeleteNeeded,
+                            Progress progress) {
         entryStream.forEach(entry -> {
             final var metaInfo = entry.getKey();
             final var file = entry.getValue();
@@ -68,6 +73,7 @@ public class FilesHandler {
                 }
             } catch (IOException e) {
                 System.err.println("ERROR! Could not copy file " + file.getAbsolutePath() + ": " + e);
+                progress.errors.incrementAndGet();
             }
 
             try {
@@ -76,6 +82,7 @@ public class FilesHandler {
                 }
             } catch (IOException e) {
                 System.err.println("ERROR! Could not delete file " + file.getAbsolutePath() + ": " + e);
+                progress.errors.incrementAndGet();
             }
         });
 
@@ -92,10 +99,9 @@ public class FilesHandler {
         System.out.println();
     }
 
-    private Stream<Map.Entry<MetaInfo, File>> wrapWithProgressBar(Stream<Map.Entry<MetaInfo, File>> entryStream) {
-        // Create a simple counter to track progress
-        final var counter = new AtomicInteger(0);
-        final int total = files.size();
+    private Stream<Map.Entry<MetaInfo, File>> wrapWithProgressBar(Stream<Map.Entry<MetaInfo, File>> entryStream, Progress progress) {
+        final var counter = progress.processed;
+        final int total = progress.total;
 
         // For parallel processing we can't show progress correctly
         if (optionsContainer.hasCommon(PARALLEL)) {
@@ -110,13 +116,23 @@ public class FilesHandler {
 
                     // Clear the line and move cursor to start
                     System.out.print("\r");
-                    System.out.printf("Processing files: %d/%d (%.1f%%)", currentCount, total, percent);
+                    System.out.printf("Processing files: %d/%d (%.1f%%), errors: %d", currentCount, total, percent, progress.errors.get());
 
                     if (currentCount == total) {
                         System.out.println(); // New line when done
                     }
                 }
             });
+        }
+    }
+
+    private static class Progress {
+        final AtomicInteger processed = new AtomicInteger(0);
+        final AtomicInteger errors = new AtomicInteger(0);
+        final int total;
+
+        Progress(int total) {
+            this.total = total;
         }
     }
 }
