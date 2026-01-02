@@ -51,10 +51,11 @@ public class FilesHandler {
             final var metaInfo = entry.getKey();
             final var file = entry.getValue();
 
+            if (isDetailsNeeded) {
+                System.out.printf("%s%s (size=%d)\n", folder, metaInfo.relativePath(), metaInfo.size());
+            }
+
             try {
-                if (isDetailsNeeded) {
-                    System.out.printf("%s%s (size=%d)\n", folder, metaInfo.relativePath(), metaInfo.size());
-                }
                 if (isCopyNeeded) {
                     for (Option it : optionsContainer.get(folder, COPY)) {
                         var copyOption = (CopyOption) it;
@@ -65,12 +66,16 @@ public class FilesHandler {
                         );
                     }
                 }
+            } catch (IOException e) {
+                System.err.println("ERROR! Could not copy file " + file.getAbsolutePath() + ": " + e);
+            }
+
+            try {
                 if (isDeleteNeeded) {
                     FileUtils.delete(file);
                 }
             } catch (IOException e) {
-                System.err.println(e);
-                throw new RuntimeException(e);
+                System.err.println("ERROR! Could not delete file " + file.getAbsolutePath() + ": " + e);
             }
         });
 

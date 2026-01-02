@@ -2,6 +2,8 @@ package ru.gasymov.foldercomparator;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
@@ -29,8 +31,25 @@ class MainTest {
     }
 
     @AfterEach
-    void destroy() throws IOException {
-        FileUtils.deleteDirectory(new File(temp));
+    void destroy() {
+        var dir = new File(temp);
+        IOException lastError = null;
+        for (var i = 0; i < 5; i++) {
+            try {
+                FileUtils.deleteDirectory(dir);
+                lastError = null;
+                break;
+            } catch (IOException e) {
+                lastError = e;
+                try {
+                    Thread.sleep(150L);
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }
+        if (lastError != null) throw new RuntimeException(lastError);
     }
 
     @Test
@@ -121,19 +140,29 @@ class MainTest {
     }
 
     @Test
-    void should_throw_error_when_copy_already_existing_file_from_dir1() throws IOException {
+    void should_throw_error_when_copy_already_existing_file_from_dir1() throws IOException, InterruptedException {
         // Create file with already existing name in folder2
-        FileUtils.touch(new File(folder2 + "/NESTED_DIR_1/file3.txt"));
+        final File file = new File(folder2 + "/NESTED_DIR_1/file3.txt");
+        FileUtils.touch(file);
 
-        Assertions.assertThrows(Exception.class, () -> Main.main(new String[]{folder1, folder2, "-c1", "-l"}));
+        Main.main(new String[]{folder1, folder2, "-c1", "-l"});
+
+        Assertions.assertTrue(Files.exists(Path.of(folder1 + "/NESTED_DIR_1/file3.txt")));
+        Assertions.assertTrue(Files.exists(Path.of(folder2 + "/NESTED_DIR_1/file3.txt")));
+        FileUtils.delete(file);
     }
 
     @Test
-    void should_throw_error_when_copy_already_existing_file_from_dir2() throws IOException {
+    void should_throw_error_when_copy_already_existing_file_from_dir2() throws IOException, InterruptedException {
         // Create file with already existing name in folder1
-        FileUtils.touch(new File(folder1 + "/NESTED_DIR_3/file4.txt"));
+        final File file = new File(folder1 + "/NESTED_DIR_3/file4.txt");
+        FileUtils.touch(file);
 
-        Assertions.assertThrows(Exception.class, () -> Main.main(new String[]{folder1, folder2, "-c2", "-l"}));
+        Main.main(new String[]{folder1, folder2, "-c2", "-l"});
+
+        Assertions.assertTrue(Files.exists(Path.of(folder1 + "/NESTED_DIR_3/file4.txt")));
+        Assertions.assertTrue(Files.exists(Path.of(folder2 + "/NESTED_DIR_3/file4.txt")));
+        FileUtils.delete(file);
     }
 
     @Test
